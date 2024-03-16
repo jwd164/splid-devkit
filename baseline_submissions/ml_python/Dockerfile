@@ -20,6 +20,10 @@ WORKDIR /app
 # COPY WHATEVER OTHER SCRIPTS YOU MAY NEED
 COPY trained_model /trained_model
 COPY submission.py utils.py ./
+COPY ew_Validator.py ./
+COPY ss_Validator.py ./
+COPY ns_ik_Validator.py ./
+COPY ns_id_Validator.py ./
  
  # SPECIFY THE ENTRYPOINT SCRIPT
 CMD python submission.py

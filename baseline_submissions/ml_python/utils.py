@@ -5,6 +5,8 @@ from fastcore.basics import Path
 def tabularize_data(data_dir, feature_cols, ground_truth=None, lag_steps=1, fill_na=True):
     merged_data = pd.DataFrame()
     test_data = Path(data_dir).glob('*.csv')
+    new_feature_cols = list(feature_cols)  # Create a copy of feature_cols
+    number_file_parsed = 0
     # Check if test_data is empty
     if not test_data:
         raise ValueError(f'No csv files found in {data_dir}')
@@ -14,14 +16,30 @@ def tabularize_data(data_dir, feature_cols, ground_truth=None, lag_steps=1, fill
         data_df['TimeIndex'] = range(len(data_df))
     
         lagged_features = []
-        new_feature_cols = list(feature_cols)  # Create a copy of feature_cols
         # Create lagged features for each column in feature_cols
-        for col in feature_cols:
-            for i in range(1, lag_steps+1):
-                lag_col_name = f'{col}_lag_{i}'
-                data_df[lag_col_name] = data_df.groupby('ObjectID')[col].shift(i)
-                new_feature_cols.append(lag_col_name)  # Add the lagged feature to new_feature_cols
+        # for col in feature_cols:
+        #     for i in range(1, lag_steps+1):
+        #         lag_col_name = f'{col}_lag_{i}'
+        #         data_df[lag_col_name] = data_df.groupby('ObjectID')[col].shift(i)
+        #         new_feature_cols.append(lag_col_name)  # Add the lagged feature to new_feature_cols
         
+        delta_column = "Delta_SemimajorAxis"
+        data_df[delta_column] = data_df["Semimajor Axis (m)"].diff(periods=2)
+        data_df[delta_column] = data_df[delta_column].fillna(0)
+        sa_spike_column = "Semimajor Axis Spike"
+        spike_threshold = 5000
+        data_df[sa_spike_column] = data_df[delta_column].apply(lambda x: 1 if x >spike_threshold else -1)
+
+        inclination_diff = "Inclination Diff"
+        data_df[inclination_diff] = data_df["Inclination (deg)"].diff()
+        data_df[inclination_diff] = data_df[inclination_diff].fillna(0)
+        inclination_direction = "Inclination Direction"
+        data_df[inclination_direction] = data_df[inclination_diff].apply(lambda x: 1 if abs(x) >0 else -1)
+
+        longitude_diff = "Longitude Diff"
+        data_df[longitude_diff] = data_df["Longitude (deg)"].diff(2)
+        data_df[longitude_diff] = data_df[longitude_diff].fillna(0)
+
         # Add the lagged features to the DataFrame all at once
         data_df = pd.concat([data_df] + lagged_features, axis=1)
 
@@ -54,6 +72,8 @@ def tabularize_data(data_dir, feature_cols, ground_truth=None, lag_steps=1, fill
             merged_df['NS'].ffill(inplace=True)
             
         merged_data = pd.concat([merged_data, merged_df])
+        number_file_parsed = number_file_parsed+1
+        # print(str(number_file_parsed))
 
     # Fill missing values (for the lagged features)
     if fill_na:

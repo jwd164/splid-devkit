@@ -12,7 +12,150 @@ class NodeDetectionEvaluator:
         self.ground_truth = ground_truth.copy()
         self.participant = participant.copy()
         self.tolerance = tolerance
-        
+
+    def evaluate_EW(self, object_id):
+        gt_object = self.ground_truth[(self.ground_truth['ObjectID'] == object_id) & \
+                          (self.ground_truth['Direction'] == 'EW')].copy()
+        p_object = self.participant[(self.participant['ObjectID'] == object_id) & \
+                                    (self.participant['Direction'] == 'EW')].copy()
+        p_object['matched_EW'] = False
+        p_object['classification_EW'] = None
+        p_object['distance'] = None
+        gt_object['classification_EW'] = None
+        gt_object['distance'] = None
+        tp = 0
+        fp = 0
+        fn = 0
+        node_wrong =0
+        type_wrong = 0
+        not_matched = 0
+        ew_fp = 0
+        ew_ik_fp =0
+        ew_id_fp =0
+
+        for gt_idx, gt_row in gt_object.iterrows():
+            matching_participant_events = p_object[
+                (p_object['TimeIndex'] >= gt_row['TimeIndex'] - self.tolerance) &
+                (p_object['TimeIndex'] <= gt_row['TimeIndex'] + self.tolerance) &
+                (p_object['Direction'] == gt_row['Direction']) & 
+                (p_object['matched_EW'] == False)
+            ]
+
+            if len(matching_participant_events) > 0:
+                p_idx = matching_participant_events.index[0]
+                p_row = matching_participant_events.iloc[0]
+                distance = p_row['TimeIndex'] - gt_row['TimeIndex']
+                if p_row['Node'] == gt_row['Node'] and p_row['Type'] == gt_row['Type']:
+                    tp += 1
+                    
+                    gt_object.loc[gt_idx, 'classification_EW'] = 'TP'
+                    gt_object.loc[gt_idx, 'distance'] = distance
+                    p_object.loc[p_idx, 'classification_EW'] = 'TP'
+                    p_object.loc[p_idx, 'distance'] = distance
+                else:
+                    fp += 1
+                    gt_object.loc[gt_idx, 'classification_EW'] = 'FP'
+                    gt_object.loc[gt_idx, 'distance'] = distance
+                    p_object.loc[p_idx, 'classification_EW'] = 'FP'
+                    p_object.loc[p_idx, 'distance'] = distance
+                    if p_row['Node']!= gt_row['Node']:
+                        node_wrong += 1
+                    if p_row['Type']!= gt_row['Type']:
+                        type_wrong +=1
+                    if p_row['Direction'] == 'EW':
+                        ew_fp +=1
+                    if p_row['Direction'] == 'NS':
+                        ns_fp +=1
+                        if p_row['Node']=='IK':
+                            ns_ik_fp+=1
+                        if p_row['Node']=='ID':
+                            ns_id_fp +=1
+                p_object.loc[matching_participant_events.index[0], 'matched_EW'] = True
+            else:
+                fn += 1
+                gt_object.loc[gt_idx, 'classification_EW'] = 'FN'
+                
+
+        additional_fp = p_object[~p_object['matched_EW']].copy()
+        ew_add_fp = additional_fp[additional_fp['Direction']=='EW'].copy()
+        ew_ik_fp += len(additional_fp[additional_fp['Node']=='IK'])
+        ew_id_fp += len(additional_fp[additional_fp['Node']=='ID'])
+        fp += len(additional_fp)
+        ew_fp += len(ew_add_fp)
+        not_matched = len(additional_fp)
+        p_object.loc[additional_fp.index, 'classification_EW'] = 'FP'
+
+        return tp, fp, fn, gt_object, p_object, node_wrong, type_wrong, not_matched, ew_ik_fp, ew_id_fp
+    
+    def evaluate_NS(self, object_id):
+        gt_object = self.ground_truth[(self.ground_truth['ObjectID'] == object_id) & \
+                          (self.ground_truth['Direction'] == 'NS')].copy()
+        p_object = self.participant[(self.participant['ObjectID'] == object_id) & \
+                                    (self.participant['Direction'] == 'NS')].copy()
+        p_object['matched_NS'] = False
+        p_object['classification_NS'] = None
+        p_object['distance'] = None
+        gt_object['classification_NS'] = None
+        gt_object['distance'] = None
+        tp = 0
+        fp = 0
+        fn = 0
+        node_wrong =0
+        type_wrong = 0
+        not_matched = 0
+        ns_ik_fp =0
+        ns_id_fp =0
+
+        for gt_idx, gt_row in gt_object.iterrows():
+            matching_participant_events = p_object[
+                (p_object['TimeIndex'] >= gt_row['TimeIndex'] - self.tolerance) &
+                (p_object['TimeIndex'] <= gt_row['TimeIndex'] + self.tolerance) &
+                (p_object['Direction'] == gt_row['Direction']) & 
+                (p_object['matched_NS'] == False)
+            ]
+
+            if len(matching_participant_events) > 0:
+                p_idx = matching_participant_events.index[0]
+                p_row = matching_participant_events.iloc[0]
+                distance = p_row['TimeIndex'] - gt_row['TimeIndex']
+                if p_row['Node'] == gt_row['Node'] and p_row['Type'] == gt_row['Type']:
+                    tp += 1
+                    
+                    gt_object.loc[gt_idx, 'classification_NS'] = 'TP'
+                    gt_object.loc[gt_idx, 'distance'] = distance
+                    p_object.loc[p_idx, 'classification_NS'] = 'TP'
+                    p_object.loc[p_idx, 'distance'] = distance
+                else:
+                    fp += 1
+                    gt_object.loc[gt_idx, 'classification_NS'] = 'FP'
+                    gt_object.loc[gt_idx, 'distance'] = distance
+                    p_object.loc[p_idx, 'classification_NS'] = 'FP'
+                    p_object.loc[p_idx, 'distance'] = distance
+                    if p_row['Node']!= gt_row['Node']:
+                        node_wrong += 1
+                    if p_row['Type']!= gt_row['Type']:
+                        type_wrong +=1
+                    if p_row['Direction'] == 'NS':
+                        if p_row['Node']=='IK':
+                            ns_ik_fp+=1
+                        if p_row['Node']=='ID':
+                            ns_id_fp +=1
+                p_object.loc[matching_participant_events.index[0], 'matched_NS'] = True
+            else:
+                fn += 1
+                gt_object.loc[gt_idx, 'classification_NS'] = 'FN'
+                
+
+        additional_fp = p_object[~p_object['matched_NS']].copy()
+        ns_add_fp = additional_fp[additional_fp['Direction']=='NS'].copy()
+        ns_ik_fp += len(additional_fp[additional_fp['Node']=='IK'])
+        ns_id_fp += len(additional_fp[additional_fp['Node']=='ID'])
+        fp += len(additional_fp)
+        not_matched = len(additional_fp)
+        p_object.loc[additional_fp.index, 'classification_NS'] = 'FP'
+
+        return tp, fp, fn, gt_object, p_object, node_wrong, type_wrong, not_matched, ns_ik_fp, ns_id_fp
+
     def evaluate(self, object_id):
         gt_object = self.ground_truth[(self.ground_truth['ObjectID'] == object_id) & \
                           (self.ground_truth['Direction'] != 'ES')].copy()
@@ -26,6 +169,13 @@ class NodeDetectionEvaluator:
         tp = 0
         fp = 0
         fn = 0
+        node_wrong =0
+        type_wrong = 0
+        not_matched = 0
+        ew_fp = 0
+        ns_fp = 0
+        ns_ik_fp =0
+        ns_id_fp =0
 
         for gt_idx, gt_row in gt_object.iterrows():
             matching_participant_events = p_object[
@@ -41,6 +191,7 @@ class NodeDetectionEvaluator:
                 distance = p_row['TimeIndex'] - gt_row['TimeIndex']
                 if p_row['Node'] == gt_row['Node'] and p_row['Type'] == gt_row['Type']:
                     tp += 1
+                    
                     gt_object.loc[gt_idx, 'classification'] = 'TP'
                     gt_object.loc[gt_idx, 'distance'] = distance
                     p_object.loc[p_idx, 'classification'] = 'TP'
@@ -51,6 +202,18 @@ class NodeDetectionEvaluator:
                     gt_object.loc[gt_idx, 'distance'] = distance
                     p_object.loc[p_idx, 'classification'] = 'FP'
                     p_object.loc[p_idx, 'distance'] = distance
+                    if p_row['Node']!= gt_row['Node']:
+                        node_wrong += 1
+                    if p_row['Type']!= gt_row['Type']:
+                        type_wrong +=1
+                    if p_row['Direction'] == 'EW':
+                        ew_fp +=1
+                    if p_row['Direction'] == 'NS':
+                        ns_fp +=1
+                        if p_row['Node']=='IK':
+                            ns_ik_fp+=1
+                        if p_row['Node']=='ID':
+                            ns_id_fp +=1
                 p_object.loc[matching_participant_events.index[0], 'matched'] = True
             else:
                 fn += 1
@@ -58,23 +221,140 @@ class NodeDetectionEvaluator:
                 
 
         additional_fp = p_object[~p_object['matched']].copy()
+        ew_add_fp = additional_fp[additional_fp['Direction']=='EW'].copy()
+        ns_add_fp = additional_fp[additional_fp['Direction']=='NS'].copy()
+        ns_ik_add_fp = ns_add_fp[ns_add_fp['Node']=='IK'].copy()
+        ns_id_add_fp = ns_add_fp[ns_add_fp['Node']=='ID'].copy()
         fp += len(additional_fp)
+        ew_fp += len(ew_add_fp)
+        ns_fp += len(ns_add_fp)
+        ns_ik_fp += len(ns_ik_add_fp)
+        ns_id_fp += len(ns_id_add_fp)
+        not_matched = len(additional_fp)
         p_object.loc[additional_fp.index, 'classification'] = 'FP'
 
-        return tp, fp, fn, gt_object, p_object
+        return tp, fp, fn, gt_object, p_object, node_wrong, type_wrong, not_matched, ew_fp, ns_fp, ns_ik_fp, ns_id_fp
     
+    def score_EW(self, debug=False):
+        total_tp = 0
+        total_fp = 0
+        total_fn = 0
+        total_wrong_node = 0
+        total_wrong_type = 0
+        total_not_matched =0
+        total_distances = []
+        total_ik_fp =0
+        total_id_fp =0
+
+        for object_id in self.ground_truth['ObjectID'].unique():
+            _, _, _, gt_object, p_object, wrong_node, wrong_type, not_matched, ew_ik_fp, ew_id_fp= self.evaluate_EW(object_id)
+            
+            total_tp += len(p_object[p_object['classification_EW'] == 'TP'])
+            total_fp += len(p_object[p_object['classification_EW'] == 'FP'])
+            total_fn += len(gt_object[gt_object['classification_EW'] == 'FN'])
+            total_wrong_type += wrong_type
+            total_wrong_node += wrong_node
+            total_not_matched += not_matched
+            total_ik_fp+=ew_ik_fp
+            total_id_fp+=ew_id_fp
+            total_distances.extend(
+                p_object[p_object['classification_EW'] == 'TP']['distance'].tolist()
+            )
+        
+        if debug:
+            print(f"Total TPs: {total_tp}")
+            print(f"Total FPs: {total_fp}")
+            print(f"Total FNs: {total_fn}")
+            print(f"Total Distances: {total_distances}")
+            print(f"Total Wrong Nodes: {total_wrong_node}")
+            print(f"Total Wrong Types: {total_wrong_type}")
+            print(f"Total Not Matched: {total_not_matched}")
+            print(f"Total IK FP: {total_ik_fp}")
+            print(f"Total ID FP: {total_id_fp}")
+            ad_fp = total_not_matched-total_id_fp-total_ik_fp
+            print(f"Total AD FP: {ad_fp}")
+
+        precision = total_tp / (total_tp + total_fp) \
+            if (total_tp + total_fp) != 0 else 0
+        recall = total_tp / (total_tp + total_fn) \
+            if (total_tp + total_fn) != 0 else 0
+        f2 = (5 * total_tp) / (5 * total_tp + 4 * total_fn + total_fp) \
+            if (5 * total_tp + 4 * total_fn + total_fp) != 0 else 0
+        rmse = np.sqrt((sum(d ** 2 for d in total_distances) / len(total_distances))) if total_distances else 0
+
+        return precision, recall, f2, rmse
+    
+    def score_NS(self, debug=False):
+        total_tp = 0
+        total_fp = 0
+        total_fn = 0
+        total_wrong_node = 0
+        total_wrong_type = 0
+        total_not_matched =0
+        total_distances = []
+        total_ik_fp =0
+        total_id_fp =0
+
+        for object_id in self.ground_truth['ObjectID'].unique():
+            _, _, _, gt_object, p_object, wrong_node, wrong_type, not_matched, ns_ik_fp, ns_id_fp= self.evaluate_NS(object_id)
+            
+            total_tp += len(p_object[p_object['classification_NS'] == 'TP'])
+            total_fp += len(p_object[p_object['classification_NS'] == 'FP'])
+            total_fn += len(gt_object[gt_object['classification_NS'] == 'FN'])
+            total_wrong_type += wrong_type
+            total_wrong_node += wrong_node
+            total_not_matched += not_matched
+            total_ik_fp+=ns_ik_fp
+            total_id_fp+=ns_id_fp
+            total_distances.extend(
+                p_object[p_object['classification_NS'] == 'TP']['distance'].tolist()
+            )
+        
+        if debug:
+            print(f"Total TPs: {total_tp}")
+            print(f"Total FPs: {total_fp}")
+            print(f"Total FNs: {total_fn}")
+            print(f"Total Distances: {total_distances}")
+            print(f"Total Wrong Nodes: {total_wrong_node}")
+            print(f"Total Wrong Types: {total_wrong_type}")
+            print(f"Total Not Matched: {total_not_matched}")
+            print(f"Total IK FP: {total_ik_fp}")
+            print(f"Total ID FP: {total_id_fp}")
+            ad_fp = total_not_matched-total_id_fp-total_ik_fp
+            print(f"Total AD FP: {ad_fp}")
+
+        precision = total_tp / (total_tp + total_fp) \
+            if (total_tp + total_fp) != 0 else 0
+        recall = total_tp / (total_tp + total_fn) \
+            if (total_tp + total_fn) != 0 else 0
+        f2 = (5 * total_tp) / (5 * total_tp + 4 * total_fn + total_fp) \
+            if (5 * total_tp + 4 * total_fn + total_fp) != 0 else 0
+        rmse = np.sqrt((sum(d ** 2 for d in total_distances) / len(total_distances))) if total_distances else 0
+
+        return precision, recall, f2, rmse
+
     def score(self, debug=False):
         total_tp = 0
         total_fp = 0
         total_fn = 0
+        total_wrong_node = 0
+        total_wrong_type = 0
+        total_not_matched =0
+        total_ew_fp =0
+        total_ns_fp =0
         total_distances = []
 
         for object_id in self.ground_truth['ObjectID'].unique():
-            _, _, _, gt_object, p_object = self.evaluate(object_id)
+            _, _, _, gt_object, p_object, wrong_node, wrong_type, not_matched, ew_fp, ns_fp,ns_ik_fp, ns_id_fp = self.evaluate(object_id)
             
             total_tp += len(p_object[p_object['classification'] == 'TP'])
             total_fp += len(p_object[p_object['classification'] == 'FP'])
             total_fn += len(gt_object[gt_object['classification'] == 'FN'])
+            total_wrong_type += wrong_type
+            total_wrong_node += wrong_node
+            total_not_matched += not_matched
+            total_ew_fp += ew_fp
+            total_ns_fp += ns_fp
             total_distances.extend(
                 p_object[p_object['classification'] == 'TP']['distance'].tolist()
             )
@@ -84,6 +364,11 @@ class NodeDetectionEvaluator:
             print(f"Total FPs: {total_fp}")
             print(f"Total FNs: {total_fn}")
             print(f"Total Distances: {total_distances}")
+            print(f"Total Wrong Nodes: {total_wrong_node}")
+            print(f"Total Wrong Types: {total_wrong_type}")
+            print(f"Total Not Matched: {total_not_matched}")
+            print(f"Total EW FP: {total_ew_fp}")
+            print(f"Total NS FP: {total_ns_fp}")
 
         precision = total_tp / (total_tp + total_fp) \
             if (total_tp + total_fp) != 0 else 0
@@ -97,7 +382,7 @@ class NodeDetectionEvaluator:
 
 
     def plot(self, object_id):
-        tp, fp, fn, gt_object, p_object = self.evaluate(object_id)
+        tp, fp, fn, gt_object, p_object,wrong_nodes, wrong_types, not_matched, ew_fp, ns_fp,ns_ik_fp, ns_id_fp = self.evaluate(object_id)
         tp_distances = p_object[p_object['classification'] == 'TP']['distance']
         mse = np.sqrt(mean_squared_error([0] * len(tp_distances), tp_distances)) if tp_distances.size else 0
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
